@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+screenshots
+.assignment
+k8s
+*.tar
+Jenkinsfile
+Jenkinsfile.ops
+docker-compose.yml
+README.md

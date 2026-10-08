@@ -1,0 +1,79 @@
+// Operations job for the Real-Time Chat Application.
+// Lets the same Jenkins controller run day-2 tasks against Docker and Kubernetes.
+
+pipeline {
+    agent any
+
+    parameters {
+        choice(name: 'ACTION',
+               choices: ['status', 'compose-up', 'compose-down', 'self-heal', 'scale', 'logs'],
+               description: 'Task to run')
+    }
+
+    environment {
+        DOCKER_BIN = 'C:\\Users\\kandu\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin'
+        COMPOSE    = 'C:\\Users\\kandu\\.docker\\cli-plugins\\docker-compose.exe'
+        KUBECONFIG = 'C:\\Users\\kandu\\.kube\\config'
+        PATH       = "${DOCKER_BIN};${env.PATH}"
+    }
+
+    stages {
+        stage('Status') {
+            when { expression { params.ACTION == 'status' } }
+            steps {
+                bat 'kubectl get nodes -o wide'
+                bat 'kubectl get all'
+                bat 'kubectl get configmap,pvc'
+            }
+        }
+
+        stage('Docker Compose Up') {
+            when { expression { params.ACTION == 'compose-up' } }
+            steps {
+                bat '"%COMPOSE%" -p realtime-chat -f docker-compose.yml up -d'
+                sleep time: 15, unit: 'SECONDS'
+                bat '"%COMPOSE%" -p realtime-chat -f docker-compose.yml ps'
+                bat 'curl.exe -s http://localhost:3100/health'
+            }
+        }
+
+        stage('Docker Compose Down') {
+            when { expression { params.ACTION == 'compose-down' } }
+            steps {
+                bat '"%COMPOSE%" -p realtime-chat -f docker-compose.yml down'
+            }
+        }
+
+        stage('Self-Healing Test') {
+            when { expression { params.ACTION == 'self-heal' } }
+            steps {
+                bat 'kubectl get pods -l app=chat-app'
+                bat 'kubectl delete pod -l app=chat-app --wait=false'
+                sleep time: 2, unit: 'SECONDS'
+                bat 'kubectl get pods -l app=chat-app'
+                bat 'kubectl rollout status deployment/chat-app --timeout=120s'
+                bat 'kubectl get pods -l app=chat-app'
+            }
+        }
+
+        stage('Scaling Test') {
+            when { expression { params.ACTION == 'scale' } }
+            steps {
+                bat 'kubectl scale deployment/chat-app --replicas=3'
+                bat 'kubectl rollout status deployment/chat-app --timeout=120s'
+                bat 'kubectl get pods -l app=chat-app -o wide'
+                bat 'kubectl scale deployment/chat-app --replicas=1'
+                sleep time: 10, unit: 'SECONDS'
+                bat 'kubectl get deployment chat-app'
+            }
+        }
+
+        stage('Logs') {
+            when { expression { params.ACTION == 'logs' } }
+            steps {
+                bat 'kubectl logs deployment/chat-app --tail=30'
+                bat 'kubectl describe service chat-app'
+            }
+        }
+    }
+}

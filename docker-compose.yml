@@ -1,0 +1,30 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: chat-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chat-app:
+    build: .
+    image: realtime-chat-app:latest
+    container_name: chat-app
+    restart: unless-stopped
+    ports:
+      - "3100:3000"
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      DB_NAME: chatdb
+      HISTORY_LIMIT: "50"
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
