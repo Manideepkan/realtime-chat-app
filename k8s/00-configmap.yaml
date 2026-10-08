@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chat-app-config
+  labels:
+    app: chat-app
+data:
+  MONGO_URL: "mongodb://mongo:27017"
+  DB_NAME: "chatdb"
+  HISTORY_LIMIT: "50"
