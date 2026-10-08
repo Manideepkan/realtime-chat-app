@@ -119,8 +119,25 @@ pipeline {
                 bat 'kubectl get pods -o wide'
                 bat 'kubectl get services'
                 bat 'kubectl get configmap,pvc'
+            }
+        }
+
+        stage('Expose Service') {
+            steps {
+                // the kind node runs inside a container, so its NodePort is not published on the
+                // Windows host; a background kubectl port-forward makes the Service reachable on localhost:30080
+                powershell '''
+                    Get-CimInstance Win32_Process -Filter "Name='kubectl.exe'" |
+                        Where-Object { $_.CommandLine -like '*port-forward*chat-app*' } |
+                        ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+                    $env:JENKINS_NODE_COOKIE = 'dontKillMe'
+                    $env:BUILD_ID = 'dontKillMe'
+                    Start-Process -FilePath "$env:DOCKER_BIN\\kubectl.exe" -WindowStyle Hidden `
+                        -ArgumentList 'port-forward', '--address', '127.0.0.1', 'service/chat-app', '30080:80'
+                '''
                 sleep time: 5, unit: 'SECONDS'
                 bat 'curl.exe -s http://localhost:30080/health'
+                bat 'curl.exe -s http://localhost:30080/api/info'
             }
         }
     }
